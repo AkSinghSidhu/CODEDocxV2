@@ -9,6 +9,69 @@ import tkinter as tk
 from PIL import Image, ImageTk
 import os
 import re
+import requests
+from typing import List
+import logging
+
+class GoogleFontManager:
+    """Manages downloading and loading of Google Fonts"""
+    
+    # Use environment variable for API key
+    GOOGLE_FONTS_API = "https://www.googleapis.com/webfonts/v1/webfonts"
+    
+    DEFAULT_FONTS = [
+        'Adobe Caslon Pro', 'Algerian', 'Andalus','Angsana New', 'AngsanaUPC', 'Arabic Typesetting', 'Arial', 'Arial Black', 'Arial Condensed', 'Arial Italic','Arial Narrow', 'Arial Narrow Bold', 'Arial Regular', 'Arial Rounded', 'Arial Rounded MT Bold','Arial Unicode', 'Arial Unicode MS', 'Baskerville','Baskerville Old Face', 'Batang', 'Bauhaus 93','Bell MT', 'Bernard MT Condensed', 'Blackadder ITC','Bodoni', 'Bodoni MT', 'Bodoni MT Condensed','Bodoni MT Poster', 'Book Antiqua', 'Bookman', 'Bookman Old Style','Brush Script', 'Brush Script MT', 'Calibri', 'Calibri Regular', 'Calisto','Calisto MT', 'Cambria', 'Cambria Math', 'Candara', 'Century', 'Century Gothic', 'Century Schoolbook', 'Comic Sans','Comic Sans Bold', 'Comic Sans MS', 'Comic Sans Regular','Consolas', 'Consolas Regular','Copperplate Gothic', 'Copperplate Gothic Bold', 'Copperplate Gothic Light','Corbel', 'Corbel Light','Corbel Regular', 'Courier', 'Courier Condensed','Courier New', 'Courier New Italic','Courier New Regular', 'Courier Regular', 'Cursive','Didot', 'Ebrima', 'Edwardian Script ITC','Felix Titling', 'Forte', 'Frank Ruhl Libre','Franklin Gothic Medium', 'Freestyle Script', 'Frutiger','Futura', 'Garamond', 'Garamond Bold', 'Garamond Condensed', 'Garamond Premier','Garamond Premier Pro', 'Garamond Pro', 'Georgia', 'Georgia Bold', 'Georgia Italic','Georgia Pro', 'Gill Sans','Gill Sans Regular', 'Goudy Old Style','Gulim', 'Gungsuh', 'GungsuhChe','Haettenschweiler', 'Harlow Solid Italic', 'Helvetica','Hoefler Text', 'Impact', 'Impact Italic', 'Ink Free','Jokerman', 'Kristen ITC', 'Lao UI','Lobster', 'Lucida Bright', 'Lucida Calligraphy', 'Lucida Console', 'Lucida Console Regular','Lucida Handwriting', 'Lucida Handwriting', 'Lucida Sans', 'Lucida Sans Italic', 'Lucida Sans Regular','Lucida Sans Unicode', 'MS Gothic', 'MS Mincho','MS PGothic', 'MS Reference Sans Serif', 'MS Reference Specialty','MS Sans Serif', 'MS Sans Serif Bold', 'MS Serif','MS UI Gothic', 'MV Boli', 'Magneto','Maiandra GD', 'Mangal', 'Marlett','Minion Pro', 'Mistral', 'Modern No. 20', 'Mongolian Baiti', 'Mongolian Regular', 'Monotype Corsiva', 'Myanmar Text', 'Myriad Pro','Nimbus Sans', 'OCR A Extended', 'Optima','Optima Italic', 'Palatino', 'Palatino Linotype', 'Papyrus', 'Papyrus Regular', 'Perpetua','Perpetua Titling', 'Perpetua Titling MT', 'Playbill','Poor Richard', 'Pristina', 'Quicksand','Rockwell', 'Rockwell Bold', 'Rockwell Condensed', 'Rockwell Extra Bold', 'Rockwell Light', 'Rockwell Regular', 'Rockwell Ultra Bold', 'Segoe Print', 'Segoe Script', 'Segoe UI', 'Segoe UI Black','Segoe UI Emoji', 'Segoe UI Historic', 'Segoe UI Light','Segoe UI Regular', 'Segoe UI Semibold', 'Segoe UI Symbol','Showcard', 'Showcard Gothic', 'SimHei','SimSun', 'Simplified Arabic', 'Simplified Arabic Fixed','Sitka', 'Snap ITC', 'Snap Regular', 'Swansea', 'Sylfaen','Tahoma', 'Tahoma Regular', 'Tempus Sans ITC', 'Times','Times New Roman', 'Times New Roman Bold', 'Times New Roman PS','Times New Roman Regular', 'Times Regular', 'Trebuchet','Trebuchet MS', 'Trebuchet Regular', 'Verdana', 'Verdana Bold', 'Verdana Italic','Verdana Regular', 'Viner Hand ITC', 'Wingdings', 'Wingdings 2', 'Wingdings 3','Yu Gothic', 'Yu Gothic UI', 'Zapf Dingbats','Zapfino', 'Zawgyi-One'
+
+
+    ]
+    
+    @classmethod
+    def get_font_list(cls, max_fonts: int = 50) -> List[str]:
+        """
+        Retrieve list of available Google Fonts with robust error handling
+        
+        Args:
+            max_fonts (int): Maximum number of Google Fonts to retrieve
+        
+        Returns:
+            List of font names, combining default fonts with Google Fonts
+        """
+        # Retrieve API key from environment variable
+        api_key = os.getenv('GOOGLE_FONTS_API_KEY')
+        if not api_key:
+            logging.warning("Google Fonts API key not found. Falling back to default fonts.")
+            return cls.DEFAULT_FONTS
+        
+        try:
+            # Add API key as a parameter
+            params = {'key': api_key}
+            response = requests.get(cls.GOOGLE_FONTS_API, params=params)
+            
+            # Raise an exception for bad responses
+            response.raise_for_status()
+            
+            # Extract font names
+            fonts = response.json().get('items', [])
+            google_fonts = [font['family'] for font in fonts[:max_fonts]]
+            
+            # Combine and deduplicate fonts
+            combined_fonts = list(dict.fromkeys(cls.DEFAULT_FONTS + google_fonts))
+            
+            return combined_fonts
+        
+        except requests.RequestException as e:
+            logging.error(f"Error fetching fonts: {e}")
+            return cls.DEFAULT_FONTS
+    
+    @classmethod
+    def set_api_key(cls, api_key: str):
+        """
+        Set the Google Fonts API key programmatically
+        
+        Args:
+            api_key (str): Google Fonts API key
+        """
+        os.environ['GOOGLE_FONTS_API_KEY'] = api_key
 
 class DocxApp:
     def __init__(self, root):
@@ -21,6 +84,9 @@ class DocxApp:
         
         self.doc = Document()
         self.q_count = 1
+        
+        # Font selection
+        self.selected_font = "Arial"  # Default font
         
         self.create_widgets()
     
@@ -87,6 +153,20 @@ class DocxApp:
         self.font_size.set(12)
         self.font_size.pack(side=LEFT, padx=(0, 20))
 
+        # Add Font selection dropdown
+        ttk.Label(options_frame, text="Font:").pack(side=LEFT, padx=(0, 5))
+        font_list = GoogleFontManager.get_font_list() or ['Arial', 'Times New Roman', 'Courier']
+        self.font_dropdown = ttk.Combobox(
+            options_frame, 
+            values=font_list, 
+            width=20
+        )
+        self.font_dropdown.set(self.selected_font)
+        self.font_dropdown.pack(side=LEFT, padx=(0, 20))
+        
+        # Bind selection event
+        self.font_dropdown.bind('<<ComboboxSelected>>', self.on_font_select)
+
         self.bold_var = ttk.BooleanVar()
         self.italic_var = ttk.BooleanVar()
         ttk.Checkbutton(options_frame, text="Bold", variable=self.bold_var).pack(side=LEFT, padx=(0, 10))
@@ -126,6 +206,10 @@ class DocxApp:
 
         self.toggle_theme()
 
+    def on_font_select(self, event):
+        """Handle font selection"""
+        self.selected_font = self.font_dropdown.get()
+
     def toggle_theme(self):
         if self.theme_var.get():
             self.root.style.theme_use("cyborg")
@@ -158,20 +242,24 @@ class DocxApp:
         q_run = q_para.add_run(f"Q{self.q_count}. ")
         q_run.bold = True
         q_run.font.size = Pt(font_size)
+        q_run.font.name = self.selected_font
         q_text_run = q_para.add_run(question)
         q_text_run.bold = True
         q_text_run.font.size = Pt(font_size)
+        q_text_run.font.name = self.selected_font
         
         code_label_para = self.doc.add_paragraph()
         code_label_run = code_label_para.add_run("Code--")
         code_label_run.bold = True
         code_label_run.font.size = Pt(font_size)
+        code_label_run.font.name = self.selected_font
         
         code_para = self.doc.add_paragraph(code)
         for run in code_para.runs:
             run.font.size = Pt(font_size)
             run.bold = bold
             run.italic = italic
+            run.font.name = self.selected_font
         
         self.doc.add_paragraph()
         
@@ -180,6 +268,7 @@ class DocxApp:
         output_label_run = output_label_para.add_run("Output--")
         output_label_run.bold = True
         output_label_run.font.size = Pt(font_size)
+        output_label_run.font.name = self.selected_font
         
         if output:
             output_para = self.doc.add_paragraph(output)
@@ -187,6 +276,7 @@ class DocxApp:
                 run.font.size = Pt(font_size)
                 run.bold = bold
                 run.italic = italic
+                run.font.name = self.selected_font
         else:
             # Add an empty paragraph if no output
             self.doc.add_paragraph()
@@ -295,4 +385,3 @@ if __name__ == "__main__":
     root = ttk.Window(themename="cyborg")
     app = DocxApp(root)
     root.mainloop()
-
